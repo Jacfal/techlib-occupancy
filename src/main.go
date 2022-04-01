@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/influxdata/influxdb-client-go/v2"
 	"golang.org/x/net/html"
 )
 
@@ -73,16 +77,54 @@ func getTechlibIndex() (string, error) {
 	return string(body), nil
 }
 
+func writeCurrentoccupancyToInflux(currOccupancy int, influxHost string, authToken string) bool {
+	log.Printf("Connecting to influx host %s\n", influxHost)
+	client := influxdb2.NewClient(influxHost, authToken)
+	defer client.Close()
+
+	writeAPI := client.WriteAPIBlocking("io.jacfal", "utils")
+	p := influxdb2.NewPointWithMeasurement("techlib-occupancy").
+		AddTag("unit", "occ").
+		AddField("value", currOccupancy).
+		SetTime(time.Now())
+	
+	err := writeAPI.WritePoint(context.Background(), p)
+	if (err != nil) {
+		log.Printf("InfluxDB writting error: %s\n", err)
+		return false
+	}
+
+	return true 
+}
+
 func main() {
 	log.Println("Starting app")
 
-	techlibIndex, err := getTechlibIndex()
-	if err != nil {
-		log.Panic("Err")
+	influxdbHost := os.Getenv("INFLUXDB_HOST")
+	influxdbAuthToken := os.Getenv("INFLUXDB_AUTH")
+
+	if influxdbHost == "" || influxdbAuthToken == "" {
+		log.Panic("INFLUXDB_HOST or INFLUXDB_AUTH env var missing")
 	}
 
-	currentOccupancy := extractCurrentNumberOfPersons(techlibIndex) 
+	for {
+		time.Sleep(1 * time.Minute)
+		log.Println("Starting new cycle...")
 
+		techlibIndex, err := getTechlibIndex()
+		if err != nil {
+			log.Printf("Can't get techlib eng index -> %s", err)
+			continue
+		}
 
-	fmt.Printf("Current -> %d\n", currentOccupancy)
+		currentOccupancy := extractCurrentNumberOfPersons(techlibIndex) 
+		fmt.Printf("Current occupancy:  %d\n", currentOccupancy)
+
+		writeSuccess := writeCurrentoccupancyToInflux(currentOccupancy, influxdbHost, influxdbAuthToken)
+		if writeSuccess {
+			log.Println("Writting success")
+		} else {
+			log.Println("Writting failed!")
+		}
+	}
 }
