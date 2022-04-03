@@ -103,6 +103,8 @@ func main() {
 	influxdbHost := os.Getenv("INFLUXDB_HOST")
 	influxdbAuthToken := os.Getenv("INFLUXDB_AUTH")
 
+	log.Printf("Using influxdb host %s\n", influxdbHost)
+
 	if influxdbHost == "" || influxdbAuthToken == "" {
 		log.Panic("INFLUXDB_HOST or INFLUXDB_AUTH env var missing")
 	}
