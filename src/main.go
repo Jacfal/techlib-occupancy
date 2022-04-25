@@ -120,8 +120,6 @@ func main() {
 		}
 
 		currentOccupancy := extractCurrentNumberOfPersons(techlibIndex) 
-		fmt.Printf("Current occupancy:  %d\n", currentOccupancy)
-
 		writeSuccess := writeCurrentoccupancyToInflux(currentOccupancy, influxdbHost, influxdbAuthToken)
 		if writeSuccess {
 			log.Println("Writting success")
